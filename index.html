@@ -1,19 +1,180 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Increment Counter</title>
-</head>
-<body>
-    <h1 id="counter">0</h1>
-    <button onclick="increment()">Increment</button>
+    <style>
+      body {
+        background-color: black;
+        color: white;
+        font: size; 12pt;
+      }
+      h1 {
+        font-size: 36pt;
+        line-height: 36pt;
+        margin: 4pt 0;
+      }
+      #numberDisplay {
+        text-align: justify;
+        letter-spacing: -2pt;
+        line-height: 4pt;
+        margin: 8pt 0;
+      }
+      #ticks, #notepad, #notes {
+        text-align: center;
+        margin: 8pt auto;
+        width: 3.5in;
+      }
+      textarea {
+        background: none;
+        border: 2pt solid #888;
+        padding: 4pt;
+        box-sizing: border-box;
+        display: block;
+        resize: none;
+        margin: 0 auto;
+        color: white;
+        width: 100%;
+      }
+      button {
+        font-family: monospace;
+        background-color: #888;
+        color: black;
+        border: none;
+        font-size: 12pt;
+        font-weight: bold;
+      }
+      ul {
+        list-style-type: none;
+        padding: 0;
+        box-sizing: border-box;
+        width: 100%;
+      }
+      li {
+        margin: 4pt 0;
+      }
+      .timestamp {
+        font-size: 10pt;
+        color: #888;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ticks">
+      <h1 id="counter">0</h1>
+      <button onclick="increment()">+ 1</button>
+      <div id="numberDisplay"></div>
+    </div>
+    <div id="notepad">
+      <textarea id="noteEntry"></textarea>
+      <button onclick="saveNote()">post</button>
+    </div>
+    <div>
+      <ul id="notes">
+        <li></li>
+      </ul>
+    </div>
+
     <script>
-        function increment() {
-            var counterElement = document.getElementById("counter");
-            var currentCount = parseInt(counterElement.textContent);
-            counterElement.textContent = currentCount + 1;
+      async function increment() {
+        var counterElement = document.getElementById("counter");
+        var currentCount = parseInt(counterElement.textContent);
+        counterElement.textContent = currentCount + 1;
+        const updatedValue = parseInt(counterElement.textContent);
+        await updateData({ numberValue: updatedValue });
+        document.getElementById("numberDisplay").innerHTML = `${" o ".repeat(
+          updatedValue,
+        )}`;
+      }
+
+      async function readData() {
+        try {
+          const response = await fetch("/getdata");
+          return await response.json();
+        } catch (error) {
+          console.error("Error reading data:", error);
+          return {};
         }
+      }
+
+      async function updateData(data) {
+        try {
+          if (data.numberValue !== undefined) {
+            await fetch("/updateNumber", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ numberValue: data.numberValue }), // Update number value
+            });
+          }
+          if (data.note) {
+            await fetch("/saveNote", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ note: data.note }), // Save note
+            });
+          }
+          console.log("Data updated successfully");
+        } catch (error) {
+          console.error("Error updating data:", error);
+        }
+      }
+
+      async function saveNote() {
+        const noteEntry = document.getElementById("noteEntry").value;
+        await updateData({ note: noteEntry });
+        document.getElementById("noteEntry").value = "";
+        await displayNotes(); // Call function to display saved notes after updating
+      }
+
+      async function displayNotes() {
+        const data = await readData();
+        const notesList = document.getElementById("notes");
+        notesList.innerHTML = ""; // Clear the current list of notes
+        if (data.notes && data.notes.length > 0) {
+          // Sort the notes based on the timestamp in descending order
+          const sortedNotes = data.notes.sort(
+            (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
+          );
+          sortedNotes.forEach((note) => {
+            const noteItem = document.createElement("li");
+            const idSpan = document.createElement("span");
+            idSpan.textContent = `${note.id} - `;
+            noteItem.appendChild(idSpan);
+            const contentSpan = document.createElement("span");
+            contentSpan.textContent = ` ${note.content} `;
+            noteItem.appendChild(contentSpan);
+            notesList.appendChild(noteItem);
+            const timestampSpan = document.createElement("div");
+            const timestampDate = new Date(note.timestamp);
+            const options = {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            };
+            const formattedDate = timestampDate.toLocaleDateString(
+              "en-US",
+              options,
+            );
+            timestampSpan.textContent = ` ${formattedDate} `;
+            timestampSpan.classList.add("timestamp"); // Adding a class to the timestamp span
+            noteItem.appendChild(timestampSpan);
+          });
+        }
+      }
+
+      window.addEventListener("load", async () => {
+        const data = await readData();
+        document.getElementById("counter").textContent = data.numberValue;
+        await displayNotes(); // Call function to display saved notes on page load
+        document.getElementById("numberDisplay").innerHTML = `${" o ".repeat(
+          data.numberValue,
+        )}`;
+      });
     </script>
-</body>
+  </body>
 </html>
